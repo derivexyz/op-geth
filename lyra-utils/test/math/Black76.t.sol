@@ -22,31 +22,6 @@ contract Black76Tester {
   function callDelta(Black76.Black76Inputs memory b76Input) external pure returns (uint) {
     return b76Input.getCallDelta();
   }
-
-  function precompile(uint32 expiry, uint64 discount, uint128 volatility, uint128 fwdPrice, uint128 strikePrice, uint8 exponent) external returns (bytes memory) {
-      bytes memory result = new bytes(96);
-
-      assembly {
-          let input := mload(0x40)
-          mstore(input, expiry)
-          mstore(add(input, 0x4), discount)
-          mstore(add(input, 0xC), volatility)
-          mstore(add(input, 0x1C), fwdPrice)
-          mstore(add(input, 0x2C), strikePrice)
-          mstore(add(input, 0x3C), exponent)
-
-          let value := mload(0x3D)
-
-          // Call the precompiled contract
-          if iszero(call(gas(), 0x0000000000000000000000000000000000000100, 0, input, 0x3D, value, 0x60)) {
-              revert(0, 0)
-          }
-
-          result := mload(value)
-      }
-
-      return result;
-  }
 }
 
 contract Black76Test is Test {
@@ -194,25 +169,5 @@ contract Black76Test is Test {
     assertApproxEqAbs(tester.annualise(365 days), 1e18, accuracy);
     assertApproxEqAbs(tester.annualise(365 days * 2), 2e18, accuracy);
     assertApproxEqAbs(tester.annualise(365 days * 2.5), 2.5e18, accuracy);
-  }
-
-  function testPrecompile() public {
-      (address alice, uint256 alicePk) = makeAddrAndKey("alice");
-      emit log_address(alice);
-      bytes32 hash = keccak256("Signed by Alice");
-      (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePk, hash);
-      address signer = ecrecover(hash, v, r, s);
-      assertEq(alice, signer); // [PASS]
-      /* bytes memory input = hex"00093A800DE0B6B3A764000000000000000000000DE0B6B3A7640000000000000000005150AE84A8CDF00000000000000000005150AE84A8CDF0000012"; */
-      uint8 exponent = 18;
-      uint32 expiry = 604800;
-      uint64 discount = 1000000000000000000;
-      uint128 volatility = 1000000000000000000;
-      uint128 fwdPrice = 1500000000000000000000;
-      uint128 strikePrice = 1500000000000000000000;
-      bytes memory result = tester.precompile(expiry, discount, volatility, fwdPrice, strikePrice, exponent);
-      console.log("RESULT LEN");
-      console.log(result.length);
-      assertEq(true,true);
   }
 }

@@ -12,7 +12,7 @@ import (
 type Black76 struct{}
  
 func (c *Black76) RequiredGas(input []byte) uint64 {
-    return uint64(500)
+    return uint64(300)
 }
 
 const minExponent int64 = 32
@@ -70,6 +70,13 @@ func (c *Black76) Run(input []byte) ([]byte, error) {
 	totalVol := new(big.Int).Div(new(big.Int).Mul(volatility, annualisedSqrt), decimalPrecision)
 	fwdDiscounted := new(big.Int).Div(new(big.Int).Mul(fwdPrice, discount), decimalPrecision)
 	if strikePrice.Cmp(zero) == 0 {
+		if expCmp < 0 {
+			expDiff := new(big.Int).Sub(bigMinExponent, exponent)
+			diffMultiplier := new(big.Int).Exp(big.NewInt(10), expDiff, nil)
+			fwdDiscounted = new(big.Int).Div(fwdDiscounted, diffMultiplier)
+			discount = new(big.Int).Div(discount, diffMultiplier)
+		}
+		// fmt.Printf("Call - %s | Put - %s | Delta - %s\n", new(big.Float).SetInt(fwdDiscounted).String(), "0", new(big.Float).SetInt(discount).String())
 		fwdDiscounted.FillBytes(output[0:32])
 		zero.FillBytes(output[32:64])
 		discount.FillBytes(output[64:96])
@@ -78,6 +85,12 @@ func (c *Black76) Run(input []byte) ([]byte, error) {
 
 	strikeDiscounted := new(big.Int).Div(new(big.Int).Mul(strikePrice, discount), decimalPrecision)
 	if fwdPrice.Cmp(zero) == 0 {
+		if expCmp < 0 {
+			expDiff := new(big.Int).Sub(bigMinExponent, exponent)
+			diffMultiplier := new(big.Int).Exp(big.NewInt(10), expDiff, nil)
+			strikeDiscounted = new(big.Int).Div(strikeDiscounted, diffMultiplier)
+		}
+		// fmt.Printf("Call - %s | Put - %s | Delta - %s\n", "0", new(big.Float).SetInt(strikeDiscounted).String(), "0")
 		zero.FillBytes(output[0:32])
 		strikeDiscounted.FillBytes(output[32:64])
 		zero.FillBytes(output[64:96])
@@ -106,7 +119,15 @@ func (c *Black76) Run(input []byte) ([]byte, error) {
 		stdPutPrice = strikeDiscounted
 	}
 
-	// fmt.Printf("Call - %s | Put - %s | Delta - %s\n", stdCallPrice.String(), stdPutPrice.String(), stdCallDelta.String())
+	if expCmp < 0 {
+		expDiff := new(big.Int).Sub(bigMinExponent, exponent)
+		diffMultiplier := new(big.Int).Exp(big.NewInt(10), expDiff, nil)
+		stdCallPrice = new(big.Int).Div(stdCallPrice, diffMultiplier)
+		stdPutPrice = new(big.Int).Div(stdPutPrice, diffMultiplier)
+		stdCallDelta = new(big.Int).Div(stdCallDelta, diffMultiplier)
+	}
+
+	// fmt.Printf("Call - %s | Put - %s | Delta - %s\n", new(big.Float).SetInt(stdCallPrice).String(), new(big.Float).SetInt(stdPutPrice).String(), new(big.Float).SetInt(stdCallDelta).String())
 	stdCallPrice.FillBytes(output[0:32])
 	stdPutPrice.FillBytes(output[32:64])
 	stdCallDelta.FillBytes(output[64:96])
