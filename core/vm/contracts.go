@@ -21,7 +21,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	stdmath "math"
 	"math/big"
 
 	"github.com/consensys/gnark-crypto/ecc"
@@ -37,8 +36,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/ethereum/go-ethereum/crypto/secp256r1"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/lyraprecompiles"
 	"golang.org/x/crypto/ripemd160"
-	"gonum.org/v1/gonum/stat/distuv"
 )
 
 // PrecompiledContract is the basic interface for native Go contracts. The implementation
@@ -69,8 +68,6 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{0x6}): &bn256AddByzantium{},
 	common.BytesToAddress([]byte{0x7}): &bn256ScalarMulByzantium{},
 	common.BytesToAddress([]byte{0x8}): &bn256PairingByzantium{},
-
-	common.BytesToAddress([]byte{0x1,0x0}): &black76{},
 }
 
 // PrecompiledContractsIstanbul contains the default set of pre-compiled Ethereum
@@ -85,8 +82,6 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{0x7}): &bn256ScalarMulIstanbul{},
 	common.BytesToAddress([]byte{0x8}): &bn256PairingIstanbul{},
 	common.BytesToAddress([]byte{0x9}): &blake2F{},
-
-	common.BytesToAddress([]byte{0x1,0x0}): &black76{},
 }
 
 // PrecompiledContractsBerlin contains the default set of pre-compiled Ethereum
@@ -102,7 +97,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{0x8}): &bn256PairingIstanbul{},
 	common.BytesToAddress([]byte{0x9}): &blake2F{},
 
-	common.BytesToAddress([]byte{0x1,0x0}): &black76{},
+	common.BytesToAddress([]byte{0x2,0x0}): &lyraprecompiles.Black76{},
 }
 
 // PrecompiledContractsCancun contains the default set of pre-compiled Ethereum
@@ -119,7 +114,7 @@ var PrecompiledContractsCancun = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{0x9}): &blake2F{},
 	common.BytesToAddress([]byte{0xa}): &kzgPointEvaluation{},
 
-	common.BytesToAddress([]byte{0x1,0x0}):  &black76{},
+	common.BytesToAddress([]byte{0x2,0x0}):  &lyraprecompiles.Black76{},
 }
 
 // PrecompiledContractsPrague contains the set of pre-compiled Ethereum
@@ -162,7 +157,6 @@ var PrecompiledContractsFjord = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{7}):          &bn256ScalarMulIstanbul{},
 	common.BytesToAddress([]byte{8}):          &bn256PairingIstanbul{},
 	common.BytesToAddress([]byte{9}):          &blake2F{},
-	common.BytesToAddress([]byte{1,0}):        &black76{},
 	common.BytesToAddress([]byte{0x0a}):       &kzgPointEvaluation{},
 	common.BytesToAddress([]byte{0x01, 0x00}): &p256Verify{},
 }
@@ -1331,163 +1325,4 @@ func (c *p256Verify) Run(input []byte) ([]byte, error) {
 		// Signature is invalid
 		return nil, nil
 	}
-}
-
-type black76 struct{}
- 
-func (c *black76) RequiredGas(input []byte) uint64 {
-    return uint64(1024)
-}
-
-const minExponent int64 = 32
- 
-var (
-    errBlack76InvalidInputLength = errors.New("invalid input length")
-	bigMinExponent = big.NewInt(minExponent)
-	decimalPrecision = new(big.Int).Exp(big.NewInt(10), bigMinExponent, nil)
-	floatPrecision = new(big.Float).SetInt(decimalPrecision)
-	zero = big.NewInt(0)
-	one = big.NewInt(1)
-)
-
-func (c *black76) Run(input []byte) ([]byte, error) {
-	defer func() {
-		if err := recover(); err != nil {
-			fmt.Println("Black 76 panicked", err)
-		}
-	}()
-
-	fmt.Println("RECEIVED INPUT OF LEN", len(input))
-	if len(input) > 61 {
-		input = input[4:]
-	}
-	if len(input) != 61 {
-        return nil, errBlack76InvalidInputLength
-	}
-	output := make([]byte, 96)
-
-	var (
-		timeToExpirySec = new(big.Int).SetBytes(getData(input, 0, 4))
-		discount = new(big.Int).SetBytes(getData(input, 4, 8))
-		volatility = new(big.Int).SetBytes(getData(input, 12, 16))
-		fwdPrice = new(big.Int).SetBytes(getData(input, 28, 16))
-		strikePrice = new(big.Int).SetBytes(getData(input, 44, 16))
-		exponent = new(big.Int).SetBytes(getData(input, 60, 1))
-	)
-
-	expCmp := exponent.Cmp(bigMinExponent)
-	if expCmp > 0 {
-		decimalPrecision = new(big.Int).Exp(big.NewInt(10), exponent, nil)
-		floatPrecision = new(big.Float).SetInt(decimalPrecision)
-	} else if expCmp < 0 {
-		expDiff := new(big.Int).Sub(bigMinExponent, exponent)
-		diffMultiplier := new(big.Int).Exp(big.NewInt(10), expDiff, nil)
-		discount = new(big.Int).Mul(discount, diffMultiplier)
-		volatility = new(big.Int).Mul(volatility, diffMultiplier)
-		fwdPrice = new(big.Int).Mul(fwdPrice, diffMultiplier)
-		strikePrice = new(big.Int).Mul(strikePrice, diffMultiplier)
-	}
-
-	tAnnualised := annualise(timeToExpirySec)
-
-	annualisedSqrt := new(big.Int).Mul(new(big.Int).Sqrt(tAnnualised), new(big.Int).Sqrt(decimalPrecision))
-	totalVol := new(big.Int).Div(new(big.Int).Mul(volatility, annualisedSqrt), decimalPrecision)
-	fwdDiscounted := new(big.Int).Div(new(big.Int).Mul(fwdPrice, discount), decimalPrecision)
-	if strikePrice.Cmp(zero) == 0 {
-		fwdDiscounted.FillBytes(output[0:32])
-		zero.FillBytes(output[32:64])
-		discount.FillBytes(output[64:96])
-		return output, nil
-	}
-
-	strikeDiscounted := new(big.Int).Div(new(big.Int).Mul(strikePrice, discount), decimalPrecision)
-	if fwdPrice.Cmp(zero) == 0 {
-		zero.FillBytes(output[0:32])
-		strikeDiscounted.FillBytes(output[32:64])
-		zero.FillBytes(output[64:96])
-		return output, nil
-	}
-
-	moneyness := new(big.Int).Div(new(big.Int).Mul(strikePrice, decimalPrecision), fwdPrice)
-
-	stdCallPrice, stdCallDelta := standardCall(moneyness, totalVol)
-
-	stdPutPrice := new(big.Int).Add(stdCallPrice, moneyness)
-	if stdPutPrice.Cmp(decimalPrecision) >= 0 {
-		stdPutPrice = new(big.Int).Sub(stdPutPrice, decimalPrecision)
-	} else {
-		stdPutPrice = zero
-	}
-
-	stdCallPrice = new(big.Int).Div(new(big.Int).Mul(stdCallPrice, fwdDiscounted), decimalPrecision)
-	stdPutPrice = new(big.Int).Div(new(big.Int).Mul(stdPutPrice, fwdDiscounted), decimalPrecision)
-	stdCallDelta = new(big.Int).Div(new(big.Int).Mul(stdCallDelta, discount), decimalPrecision)
-
-	if stdCallPrice.Cmp(fwdDiscounted) > 0 {
-		stdCallPrice = fwdDiscounted
-	}
-	if stdPutPrice.Cmp(strikeDiscounted) > 0 {
-		stdPutPrice = strikeDiscounted
-	}
-
-	fmt.Printf("Call - %s | Put - %s | Delta - %s\n", stdCallPrice.String(), stdPutPrice.String(), stdCallDelta.String())
-	stdCallPrice.FillBytes(output[0:32])
-	stdPutPrice.FillBytes(output[32:64])
-	stdCallDelta.FillBytes(output[64:96])
-    return output, nil
-}
-
-func getNormalFloat(number *big.Int) float64 {
-	res, _ := new(big.Float).Quo(new(big.Float).SetInt(number), floatPrecision).Float64()
-	return res
-}
-
-func getBigInt(number float64) *big.Int {
-	res := new(big.Int)
-	new(big.Float).Mul(new(big.Float).SetFloat64(number), floatPrecision).Int(res)
-
-	return res
-}
-
-func annualise(seconds *big.Int) *big.Int {
-	var secondsPerYear = big.NewInt(365 * 24 * 60 * 60)
-
-	return new(big.Int).Div(new(big.Int).Mul(seconds, decimalPrecision), secondsPerYear)
-}
-
-func standardCall(moneyness *big.Int, totalVol *big.Int) (*big.Int, *big.Int) {
-	var maxTotalVol = new(big.Int).Mul(big.NewInt(24), decimalPrecision)
-
-	if totalVol.Cmp(maxTotalVol) >= 0 {
-		return decimalPrecision, decimalPrecision
-	}
-
-	stdVol, stdMoneyness := totalVol, moneyness
-	if totalVol.Cmp(zero) == 0 {
-		stdVol = one
-	}
-	if moneyness.Cmp(zero) == 0 {
-		stdMoneyness = one
-	}
-
-	k := getBigInt(stdmath.Log(getNormalFloat(stdMoneyness)))
-	halfV2t := new(big.Int).Div(new(big.Int).Mul(new(big.Int).Rsh(stdVol, 1), stdVol), decimalPrecision)
-
-	d1 := new(big.Int).Div(new(big.Int).Mul(new(big.Int).Sub(halfV2t, k), decimalPrecision), stdVol)
-	d2 := new(big.Int).Sub(d1, stdVol)
-
-	// CDF calculations
-	dist := distuv.Normal{
-		Mu:    0,
-		Sigma: 1,
-	}
-	d1 = getBigInt(dist.CDF(getNormalFloat(d1)))
-	d2 = getBigInt(dist.CDF(getNormalFloat(d2)))
-	d2 = new(big.Int).Div(new(big.Int).Mul(stdMoneyness, d2), decimalPrecision)
-
-	res1 := big.NewInt(0)
-	if d1.Cmp(d2) >= 0 {
-		res1 = new(big.Int).Sub(d1, d2)
-	}
-	return res1, d1
 }

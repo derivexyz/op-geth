@@ -26,6 +26,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/lyraprecompiles"
 )
 
 // precompiledTest defines the input/output pairs for precompiled contract tests.
@@ -70,6 +71,8 @@ var allPrecompiles = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{0x0f, 0x10}): &bls12381Pairing{},
 	common.BytesToAddress([]byte{0x0f, 0x11}): &bls12381MapG1{},
 	common.BytesToAddress([]byte{0x0f, 0x12}): &bls12381MapG2{},
+
+	common.BytesToAddress([]byte{0x2,0x0}):  &lyraprecompiles.Black76{},
 }
 
 // EIP-152 test vectors
@@ -421,3 +424,13 @@ func BenchmarkPrecompiledP256Verify(bench *testing.B) {
 }
 
 func TestPrecompiledP256Verify(t *testing.T) { testJson("p256Verify", "100", t) }
+
+
+func BenchmarkPrecompiledBlack76(bench *testing.B) {
+	t := precompiledTest{
+		Input:    "00093A800DE0B6B3A764000000000000000000000DE0B6B3A7640000000000000000005150AE84A8CDF00000000000000000005150AE84A8CDF0000012",
+		Expected: "0000000000000000000000000000000000019842b496ff9677f884d4aa84d99c0000000000000000000000000000000000019842b496ff9677f884d4aa84d99c0000000000000000000000000000000000000299ed4d34bb610c17afc962e03d",
+		Name:     "black76",
+	}
+	benchmarkPrecompiled("200", t, bench)
+}
