@@ -3,7 +3,6 @@ package lyraprecompiles
 import (
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 
 	"gonum.org/v1/gonum/stat/distuv"
@@ -15,7 +14,7 @@ func (c *Black76) RequiredGas(input []byte) uint64 {
     return uint64(300)
 }
 
-const minExponent int64 = 32
+const minExponent int64 = 18
  
 var (
     errBlack76InvalidInputLength = errors.New("invalid input length")
@@ -167,7 +166,8 @@ func standardCall(moneyness *big.Int, totalVol *big.Int) (*big.Int, *big.Int) {
 		stdMoneyness = one
 	}
 
-	k := getBigInt(math.Log(getNormalFloat(stdMoneyness)))
+	logFloor, _ := bigIntLog(big.NewInt(2), stdMoneyness)
+	k := big.NewInt(logFloor)
 	halfV2t := new(big.Int).Div(new(big.Int).Mul(new(big.Int).Rsh(stdVol, 1), stdVol), decimalPrecision)
 
 	d1 := new(big.Int).Div(new(big.Int).Mul(new(big.Int).Sub(halfV2t, k), decimalPrecision), stdVol)
@@ -189,3 +189,26 @@ func standardCall(moneyness *big.Int, totalVol *big.Int) (*big.Int, *big.Int) {
 	return res1, d1
 }
 
+// bigIntLog is like intLog, but for BigInt.
+// Note that the integer log portion always fits in an Int:
+// any non-trivial result is using base b ≥ 2,
+// bounding the result by the number of bits in v.
+func bigIntLog(b, v *big.Int) (i int64, r *big.Int) {
+	if b.Cmp(one) <= 0 || v.Cmp(b) < 0 {
+		return 0, v
+	}
+	if z := new(big.Int).Mod(v, b); z.Cmp(zero) != 0 {
+		return 0, v
+	}
+
+	// Only compute b*b if it can be smaller than v.
+	if 2*b.BitLen()-1 <= v.BitLen() {
+		i, v = bigIntLog(new(big.Int).Mul(b, b), v)
+		i <<= 1
+	}
+	if v.Cmp(b) >= 0 {
+		v = new(big.Int).Div(v, b)
+		i |= 1
+	}
+	return i, v
+}
