@@ -7,7 +7,7 @@ use crate::{utils, Error, Result};
 const FRAC_1_SQRT_PI: f64 = 0.564189583547756286948079451560772586_f64;
 const FRAC_1_SQRT_2_PI: f64 = FRAC_1_SQRT_PI * std::f64::consts::FRAC_1_SQRT_2;
 const SEC_PER_YEAR: f64 = 365.0 * 24.0 * 60.0 * 60.0;
-const BLACK76_GAS: u64 = 300;
+pub const BLACK76_GAS: u64 = 300;
 
 #[no_mangle]
 pub extern "C" fn __precompile_black76_gas(_data_ptr: *const u8, _data_len: usize) -> u64 {

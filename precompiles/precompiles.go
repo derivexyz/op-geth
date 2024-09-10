@@ -28,7 +28,7 @@ func (a *Black76) RequiredGas(input []byte) uint64 {
 }
 
 func (a *Black76) Run(input []byte) ([]byte, error) {
-	output := make([]byte, 1024)
+	output := make([]byte, 48)
 	cout := unsafe.Pointer(&output[0])
 
 	cstr := unsafe.Pointer(&input[0])
@@ -38,7 +38,7 @@ func (a *Black76) Run(input []byte) ([]byte, error) {
 
 	res := C.__precompile_black76(cstr, len, cout, out_len_ptr)
 
-	output[1023] = byte(res)
+	output[47] = byte(res)
 
 	output2 := make([]byte, out_len)
 	copy(output2, output[:out_len])
