@@ -20,7 +20,7 @@ pub extern "C" fn __precompile_black76(
     data_ptr: *const u8,
     data_len: usize,
     ret_val: *mut u8,
-    ret_len: *mut usize,
+    ret_len: *mut u16,
 ) -> u8 {
     let data = unsafe { slice::from_raw_parts(data_ptr, data_len) };
 
@@ -29,7 +29,7 @@ pub extern "C" fn __precompile_black76(
             let ret = unsafe { slice::from_raw_parts_mut(ret_val, v.len()) };
             ret.copy_from_slice(&v);
             unsafe {
-                *ret_len = v.len();
+                *ret_len = v.len() as u16;
             };
             0
         },
