@@ -121,7 +121,6 @@ fn calculate_black76(args: &[u8]) -> Result<([u8; 16], [u8; 16], [u8; 16])> {
     }
 
     let (exponent, expiry_sec, discount, vol, fwd, strike) = extract_arguments(args);
-    // println!("EXPONENT {} | EXPIRY_SEC {} | DISCOUNT {} | VOL {} | FWD {} | STRIKE {}", exponent, expiry_sec, discount, vol, fwd, strike);
 
     let fwd_discounted = fwd * discount;
     if strike <= 0.0 {
@@ -152,8 +151,6 @@ fn calculate_black76(args: &[u8]) -> Result<([u8; 16], [u8; 16], [u8; 16])> {
     black76.is_call = false;
     let put_price = black76.price(fwd, vol);
 
-    // let call_price = call_price * fwd_discounted;
-    // let put_price = put_price * fwd_discounted;
     let call_delta = call_delta * discount;
 
     let call_price = if call_price > fwd_discounted {
