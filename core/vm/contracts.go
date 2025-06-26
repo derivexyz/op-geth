@@ -36,6 +36,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/ethereum/go-ethereum/crypto/secp256r1"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/precompiles"
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -95,6 +96,8 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{0x7}): &bn256ScalarMulIstanbul{},
 	common.BytesToAddress([]byte{0x8}): &bn256PairingIstanbul{},
 	common.BytesToAddress([]byte{0x9}): &blake2F{},
+
+	common.BytesToAddress([]byte{0x2,0x0}): &precompiles.Black76{},
 }
 
 // PrecompiledContractsCancun contains the default set of pre-compiled Ethereum
@@ -110,6 +113,8 @@ var PrecompiledContractsCancun = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{0x8}): &bn256PairingIstanbul{},
 	common.BytesToAddress([]byte{0x9}): &blake2F{},
 	common.BytesToAddress([]byte{0xa}): &kzgPointEvaluation{},
+
+	common.BytesToAddress([]byte{0x2,0x0}): &precompiles.Black76{},
 }
 
 // PrecompiledContractsPrague contains the set of pre-compiled Ethereum

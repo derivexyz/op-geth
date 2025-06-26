@@ -26,6 +26,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/precompiles"
 )
 
 // precompiledTest defines the input/output pairs for precompiled contract tests.
@@ -70,6 +71,8 @@ var allPrecompiles = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{0x0f, 0x10}): &bls12381Pairing{},
 	common.BytesToAddress([]byte{0x0f, 0x11}): &bls12381MapG1{},
 	common.BytesToAddress([]byte{0x0f, 0x12}): &bls12381MapG2{},
+
+	common.BytesToAddress([]byte{2,0}):  &precompiles.Black76{},
 }
 
 // EIP-152 test vectors
@@ -421,3 +424,7 @@ func BenchmarkPrecompiledP256Verify(bench *testing.B) {
 }
 
 func TestPrecompiledP256Verify(t *testing.T) { testJson("p256Verify", "100", t) }
+
+func TestPrecompiledBlack76(t *testing.T) { testJson("black76", "200", t) }
+
+func BenchmarkPrecompiledBlack76(b *testing.B) { benchJson("black76", "200", b) }
